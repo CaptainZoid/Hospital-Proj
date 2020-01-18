@@ -226,12 +226,10 @@ class Patient:
         >>> hosp.patients[3].is_prescribed("Propofol")
         True
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        for visits in self.history:
+            if visits.prescribed == medication:
+                return True
+        return False
 
     def followups(self, month: str) -> List[datetime]:
         """ Return a list of days (i.e. datetime objects) when patient
@@ -264,12 +262,17 @@ class Patient:
         >>> hosp.patients[1].followups('Sep')
         [datetime.date(1997, 9, 26), datetime.date(1997, 9, 11)]
         """
+        int_month = 0
+        for i in range(len(MONTH_ABBREV)):
+            if MONTH_ABBREV[i] == month:
+                int_month = i + 1
 
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        followups = []
+        for visit in self.history:
+            if not visit.followup_date is None and \
+                    visit.followup_date.month == int_month:
+                followups.append(visit.followup_date)
+        return followups
 
     def prescribed_after(self, date: datetime.date) -> List[str]:
         """Return the list of medications (strings) prescribed after (inclusive)
@@ -304,12 +307,11 @@ class Patient:
         ['Miconazole Powder', 'Acetaminophen', 'Sucralfate', 'sodium bicarb',
          'Hydrochlorothiazide']
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        final = []
+        for visit in self.history:
+            if date > visit.date:
+                final.append(visit.prescribed)
+        return final
 
     def missed_followups(self) -> Tuple[int, int]:
         """ Return the number of missed and kept followups for this Patient.
@@ -346,7 +348,7 @@ class Patient:
         >>> hosp.patients[66].missed_followups()
         (10, 2)
         """
-        
+
         # ===== #
         # TO DO #
         # ===== #
@@ -592,7 +594,7 @@ class Hospital:
         # ===== #
         # TO DO #
         # ===== #
-        
+
         pass
 
     def patients_seen(self, doctor: Doctor, start_date: datetime.date,
