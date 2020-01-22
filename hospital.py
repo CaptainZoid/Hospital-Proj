@@ -309,7 +309,7 @@ class Patient:
         """
         final = []
         for visit in self.history:
-            if date > visit.date:
+            if date < visit.date:
                 final.append(visit.prescribed)
         return final
 
@@ -348,12 +348,24 @@ class Patient:
         >>> hosp.patients[66].missed_followups()
         (10, 2)
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        curr_ate: datetime
+        num_fu = 0
+        num_suc_fu = 0
+        if len(self.history) == 1:
+            # In case there was only one visit
+            return 1, 0
+        for i in range(len(self.history) - 1):
+            curr_date = datetime.date(1400, 1, 1)
+            # Just to have it assigned to something
+            if self.history[i].followup_date:
+                # Checking to see a follow up date actually exists
+                curr_date = self.history[i].followup_date
+                num_fu += 1
+            for days in self.history:
+                # Checking for matching dates
+                if days.date == curr_date:
+                    num_suc_fu += 1
+        return num_fu, num_suc_fu
 
 
 class Hospital:
@@ -398,7 +410,7 @@ class Hospital:
         """ Return a human-readable representation of this object.
         Do not modify this! This is not to be used to reconstruct the object.
         """
-        return "Hospital on "+self.address
+        return "Hospital on " + self.address
 
     def load_doctors(self, file_name: str) -> None:
         """
@@ -777,9 +789,11 @@ class Hospital:
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
     import python_ta
+
     python_ta.check_all(config={
         'allowed-io': [
             'loaddata.load_doctors',
@@ -788,7 +802,7 @@ if __name__ == "__main__":
             'loaddata.load_attendance',
             'loaddata.read_hospital',
             'load_schedules'
-            ],
+        ],
         'allowed-import-modules': [
             'loaddata',
             'doctest',
