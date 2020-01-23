@@ -459,7 +459,7 @@ class Hospital:
             01/22/2017
             03/19/2017
 
-            Mikhail Varshavski
+            Mikhail Varshavsk
             01/23/2017
             04/03/2018
 
@@ -470,12 +470,40 @@ class Hospital:
         >>> hosp.load_doctors("data/year97/doctors.csv")
         >>> hosp.load_schedules("data/year97/schedule.dat")
         """
+        """
+        file = open(file_name, 'r')
+        status = False
+        curr_doctor = ''
+        for line in file:
+            if status == False and line in self.doctors:
+                curr_doctor = line
+                status = True
+            elif status == True and not line in self.doctors:
+        """
+        docs = []
+        for doctors in self.doctors:
+            docs.append(doctors.name)
+            for month in MONTH_ABBREV:
+                doctors.schedule[month] = []
+        file = open(file_name, 'r')
+        status = False
+        curr_doc = ''
+        for line in file:
+            if status is False and line[0:-1] in docs:
+                print(line)
+                curr_doc = line[0:-1]
+                status = True
+            elif status is True and not line == '\n':
+                i = docs.index(curr_doc)
+                self.doctors[i].schedule[MONTH_ABBREV[int(line[0:2])]] \
+                    += [datetime.date(int(line[6:]),
+                                      int(line[0:2]), int(line[3:5]))]
+            else:
+                status = False
+        return self.doctors[0].schedule
 
-        # ======================
-        # TO DO : DO THIS FIRST
-        # ======================
 
-        pass
+
 
     def load_attendance(self, file_name: str) -> None:
         """
