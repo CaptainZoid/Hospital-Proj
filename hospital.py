@@ -346,7 +346,8 @@ class Patient:
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
         >>> hosp.patients[66].missed_followups()
-        (10, 2)
+        (9, 2)
+        """
         """
         curr_ate: datetime
         num_fu = 0
@@ -366,7 +367,7 @@ class Patient:
                 if days.date == curr_date:
                     num_suc_fu += 1
         return num_fu, num_suc_fu
-
+        """
 
 class Hospital:
     """ An object for modelling the daily operation of a hospital with doctors
