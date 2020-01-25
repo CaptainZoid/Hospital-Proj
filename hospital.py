@@ -466,45 +466,29 @@ class Hospital:
 
         Names and schedules that do not correspond to doctors from self.doctors
         are ignored. Otherwise, those doctors' schedule attributes are updated.
-
         >>> hosp = Hospital("123 Welks Rd, Letterkenny ON, K0J-2E0, Canada")
         >>> hosp.load_doctors("data/year97/doctors.csv")
         >>> hosp.load_schedules("data/year97/schedule.dat")
         """
-        """
-        file = open(file_name, 'r')
-        status = False
-        curr_doctor = ''
-        for line in file:
-            if status == False and line in self.doctors:
-                curr_doctor = line
-                status = True
-            elif status == True and not line in self.doctors:
-        """
         docs = []
-        for doctors in self.doctors:
-            docs.append(doctors.name)
+        for doctor in self.doctors:
+            docs.append(doctor.name)
             for month in MONTH_ABBREV:
-                doctors.schedule[month] = []
+                doctor.schedule[month] = []
         file = open(file_name, 'r')
         status = False
         curr_doc = ''
         for line in file:
             if status is False and line[0:-1] in docs:
-                print(line)
                 curr_doc = line[0:-1]
                 status = True
             elif status is True and not line == '\n':
-                i = docs.index(curr_doc)
-                self.doctors[i].schedule[MONTH_ABBREV[int(line[0:2])]] \
+                location = docs.index(curr_doc)
+                self.doctors[location].schedule[MONTH_ABBREV[int(line[0:2])-1]] \
                     += [datetime.date(int(line[6:]),
                                       int(line[0:2]), int(line[3:5]))]
             else:
                 status = False
-        return self.doctors[0].schedule
-
-
-
 
     def load_attendance(self, file_name: str) -> None:
         """
