@@ -46,7 +46,7 @@ class HospitalVisit:
 
     Representation Invariants
     =========================
-    - not followup_date or date >= followup_date
+    - not followup_date or date <= followup_date
 
     Sample Usage
     ============
@@ -75,7 +75,7 @@ class HospitalVisit:
 
     def __init__(self, date: datetime.date, doctor_id: int, patient_id: int,
                  diagnosis: str, prognosis: str, prescribed: str,
-                 followup: datetime) -> None:
+                 followup: datetime.date) -> None:
         """Initialize this HospitalVisit.
         """
         self.date = date
@@ -121,10 +121,10 @@ class Doctor:
     ============
 
     >>> bob = Doctor("Bob Loot", 98765432, 1079.80)
-    >>> bob.schedule['Jan'].append(datetime.date(2017, 10, 23))
-    >>> bob.schedule['Jan'].append(datetime.date(2017, 10, 24))
-    >>> bob.schedule['Jan']
-    [datetime.date(2017, 10, 23), datetime.date(2017, 10, 24)]
+    >>> bob.schedule['Jan'].append(datetime.date(2017, 1, 23))
+    >>> bob.schedule['Jan'].append(datetime.date(2017, 1, 24))
+    >>> sorted(bob.schedule['Jan'])
+    [datetime.date(2017, 1, 23), datetime.date(2017, 1, 24)]
     >>> bob.schedule['Feb']
     []
     """
@@ -132,7 +132,7 @@ class Doctor:
     name: str
     id: int
     salary: float
-    schedule: Dict[str, List[datetime]]
+    schedule: Dict[str, List[datetime.date]]
 
     def __init__(self, name: str, id_num: int, salary: float) -> None:
         """ Initialize this Doctor with name <name>, identification number
@@ -154,6 +154,12 @@ class Doctor:
         Two doctors are equal when their (unique) ids are equal.
         """
         return self.id == other.id
+
+    def __lt__(self, other: Doctor) -> bool:
+        """ Return True if this Doctor is ordered earlier than <other>.
+        Ordering is given by Doctor.id
+        """
+        return self.id < other.id
 
 
 class Patient:
@@ -197,6 +203,12 @@ class Patient:
         """
         return self.id == other.id
 
+    def __lt__(self, other: Patient) -> bool:
+        """ Return True if this Patient is ordered earlier than <other>.
+        Ordering is given by Patient.id
+        """
+        return self.id < other.id
+
     def is_prescribed(self, medication: str) -> bool:
         """
         Return True only when this Patient has been prescribed <medication>
@@ -231,7 +243,7 @@ class Patient:
                 return True
         return False
 
-    def followups(self, month: str) -> List[datetime]:
+    def followups(self, month: str) -> List[datetime.date]:
         """ Return a list of days (i.e. datetime objects) when patient
         has followups during the month <month>.
         The <month> is represented using the abbreviations: {'Jan',...,'Dec'}.
@@ -255,12 +267,12 @@ class Patient:
         []
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
-        >>> hosp.patients[0].followups('Feb')
+        >>> sorted(hosp.patients[0].followups('Feb'))
         [datetime.date(2017, 2, 6)]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
-        >>> hosp.patients[1].followups('Sep')
-        [datetime.date(1997, 9, 26), datetime.date(1997, 9, 11)]
+        >>> sorted(hosp.patients[1].followups('Sep'))
+        [datetime.date(1997, 9, 11), datetime.date(1997, 9, 26)]
         """
         int_month = 0
         for i in range(len(MONTH_ABBREV)):
@@ -298,14 +310,14 @@ class Patient:
         []
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
-        >>> hosp.patients[0].prescribed_after(datetime.date(1900,1,1))
+        >>> sorted(hosp.patients[0].prescribed_after(datetime.date(1900,1,1)))
         ['Amiodarone HCl', 'Propofol']
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
-        >>> hosp.patients[0].prescribed_after(datetime.date(1900,1,1)) \
+        >>> sorted(hosp.patients[0].prescribed_after(datetime.date(1900,1,1))) \
             #doctest: +NORMALIZE_WHITESPACE
-        ['Miconazole Powder', 'Acetaminophen', 'Sucralfate', 'sodium bicarb',
-         'Hydrochlorothiazide']
+        ['Acetaminophen', 'Hydrochlorothiazide', 'Miconazole Powder',
+         'Sucralfate', 'sodium bicarb']
         """
         final = []
         for visit in self.history:
@@ -349,25 +361,26 @@ class Patient:
         (9, 2)
         """
         """
-        curr_ate: datetime
-        num_fu = 0
-        num_suc_fu = 0
-        if len(self.history) == 1:
-            # In case there was only one visit
-            return 1, 0
-        for i in range(len(self.history) - 1):
-            curr_date = datetime.date(1400, 1, 1)
-            # Just to have it assigned to something
-            if self.history[i].followup_date:
-                # Checking to see a follow up date actually exists
-                curr_date = self.history[i].followup_date
-                num_fu += 1
-            for days in self.history:
-                # Checking for matching dates
-                if days.date == curr_date:
-                    num_suc_fu += 1
-        return num_fu, num_suc_fu
-        """
+                curr_ate: datetime
+                num_fu = 0
+                num_suc_fu = 0
+                if len(self.history) == 1:
+                    # In case there was only one visit
+                    return 1, 0
+                for i in range(len(self.history) - 1):
+                    curr_date = datetime.date(1400, 1, 1)
+                    # Just to have it assigned to something
+                    if self.history[i].followup_date:
+                        # Checking to see a follow up date actually exists
+                        curr_date = self.history[i].followup_date
+                        num_fu += 1
+                    for days in self.history:
+                        # Checking for matching dates
+                        if days.date == curr_date:
+                            num_suc_fu += 1
+                return num_fu, num_suc_fu
+                """
+
 
 class Hospital:
     """ An object for modelling the daily operation of a hospital with doctors
@@ -394,8 +407,8 @@ class Hospital:
     address: str
     doctors: List[Doctor]
     patients: List[Patient]
-    attendance: Dict[datetime, List[Doctor]]
-    admissions: Dict[datetime, List[HospitalVisit]]
+    attendance: Dict[datetime.date, List[str]]
+    admissions: Dict[datetime.date, List[HospitalVisit]]
 
     def __init__(self, address: str) -> None:
         """ Create a new Hospital with the given parameters."""
@@ -411,7 +424,7 @@ class Hospital:
         """ Return a human-readable representation of this object.
         Do not modify this! This is not to be used to reconstruct the object.
         """
-        return "Hospital on " + self.address
+        return "Hospital on "+self.address
 
     def load_doctors(self, file_name: str) -> None:
         """
@@ -460,16 +473,18 @@ class Hospital:
             01/22/2017
             03/19/2017
 
-            Mikhail Varshavsk
+            Mikhail Varshavski
             01/23/2017
             04/03/2018
 
         Names and schedules that do not correspond to doctors from self.doctors
         are ignored. Otherwise, those doctors' schedule attributes are updated.
+
         >>> hosp = Hospital("123 Welks Rd, Letterkenny ON, K0J-2E0, Canada")
         >>> hosp.load_doctors("data/year97/doctors.csv")
         >>> hosp.load_schedules("data/year97/schedule.dat")
         """
+
         docs = []
         for doctor in self.doctors:
             docs.append(doctor.name)
@@ -484,7 +499,8 @@ class Hospital:
                 status = True
             elif status is True and not line == '\n':
                 location = docs.index(curr_doc)
-                self.doctors[location].schedule[MONTH_ABBREV[int(line[0:2])-1]] \
+                self.doctors[location].schedule[
+                    MONTH_ABBREV[int(line[0:2]) - 1]] \
                     += [datetime.date(int(line[6:]),
                                       int(line[0:2]), int(line[3:5]))]
             else:
@@ -492,16 +508,16 @@ class Hospital:
 
     def load_attendance(self, file_name: str) -> None:
         """
-        Update the attendance records for this Hospital from <file_name>, a csv
-        file.
+        Update the attendance records for this Hospital from <file_name>,
+        a comma-delimited file.
 
         Lines of <file_name> have the following format:
-            DD/MM/YYYY,firstname lastname,firstname lastname,...
+            MM/DD/YYYY,firstname lastname,firstname lastname,...
         For example:
             01/08/2019,Alice Liddle,Bob Loot
-            02/08/2019,Carol Bitter
+            01/09/2019,Carol Bitter
         which indicates that on 01/08/2019, Dr. Alice Liddle and Dr. Bob Loot
-        showed up for work, and on 02/08/2019 only Dr. Carol Bitter was working
+        showed up for work, and on 01/09/2019 only Dr. Carol Bitter was working
         at the hospital on that day.
 
         >>> hosp = Hospital("123 Welks Rd, Letterkenny ON, K0J-2E0, Canada")
@@ -533,7 +549,7 @@ class Hospital:
         >>> hosp = Hospital("123 Welks Rd, Letterkenny ON, K0J-2E0, Canada")
         >>> carol = Patient("Carol Loot", 44021721)
         >>> hosp.admit_patient(carol)
-        >>> hosp.patients
+        >>> sorted(hosp.patients)
         [Pid: 44021721]
         """
         self.patients.append(patient)
@@ -566,12 +582,11 @@ class Hospital:
         >>> round(hosp.projected_expenses(), 0)
         622622.0
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        total = 0
+        for doctor in self.doctors:
+            for month in MONTH_ABBREV:
+                total += doctor.salary * len(doctor.schedule[month])
+        return total
 
     def actual_expenses(self) -> float:
         """
@@ -590,12 +605,13 @@ class Hospital:
         >>> hosp.actual_expenses()
         623485.81
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        total = 0
+        for day in self.attendance:
+            for doctor in self.attendance[day]:
+                for docs in self.doctors:
+                    if docs.name == doctor:
+                        total += docs.salary
+        return total
 
     def reminders(self, date: datetime.date, delta: int) -> List[Patient]:
         """
@@ -606,21 +622,23 @@ class Hospital:
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> hosp.reminders(datetime.date(2017,1,1), 20)
-        [Pid: 44276583, Pid: 44926521, Pid: 44077293]
+        >>> sorted(hosp.reminders(datetime.date(2017,1,1), 20))
+        [Pid: 44077293, Pid: 44276583, Pid: 44926521]
         >>> hosp.reminders(datetime.date(2018,11,1), 300)
         []
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> hosp.reminders(datetime.date(1997,10,17), 3)
-        [Pid: 44065518, Pid: 44522886, Pid: 44228524, Pid: 44888118]
+        >>> sorted(hosp.reminders(datetime.date(1997,10,17), 3))
+        [Pid: 44065518, Pid: 44228524, Pid: 44522886, Pid: 44888118]
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        follow_ups = []
+        new_time = date + datetime.timedelta(delta)
+        for patient in self.patients:
+            for visit in patient.history:
+                if visit.followup_date is not None and \
+                        date <= visit.followup_date <= new_time:
+                    follow_ups.append(patient)
+        return follow_ups
 
     def patients_seen(self, doctor: Doctor, start_date: datetime.date,
                       end_date: datetime.date) -> int:
@@ -646,12 +664,16 @@ class Hospital:
         >>> hosp.patients_seen(bob, d1, d2)
         5
         """
-
-        # ===== #
-        # TO DO #
-        # ===== #
-
-        pass
+        total = 0
+        temp_list = []
+        for patient in self.patients:
+            for visit in patient.history:
+                if visit.doctor_id == doctor.id \
+                        and start_date <= visit.date <= end_date \
+                        and patient not in temp_list:
+                    total += 1
+                    temp_list.append(patient)
+        return total
 
     def busiest_doctors(self, start_date: datetime.date,
                         end_date: datetime.date) -> List[Doctor]:
@@ -663,21 +685,26 @@ class Hospital:
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
         >>> d1 = datetime.date(2017, 1, 1)
         >>> d2 = datetime.date(2017, 1, 31)
-        >>> hosp.busiest_doctors(d1, d2)
+        >>> sorted(hosp.busiest_doctors(d1, d2))
         [Did: 99262168]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> d1 = datetime.date(1997, 1, 1)
         >>> d2 = datetime.date(1997, 2, 1)
-        >>> hosp.busiest_doctors(d1, d2)
+        >>> sorted(hosp.busiest_doctors(d1, d2))
         [Did: 99366005]
         """
+        doc_nums = {}
+        # Adding doctors to the dictionary
+        for doctor in self.doctors:
+            doc_nums[doctor] = 0
+        # checking the visits
+        for people in self.patients:
+            for visit in people.history:
+                if visit
 
-        # ===== #
-        # TO DO #
-        # ===== #
 
-        pass
+
 
     def coverage(self, bob: Doctor, alice: Doctor) -> List[datetime]:
         """
@@ -693,23 +720,21 @@ class Hospital:
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
         >>> bob = hosp.doctors[6]
         >>> alice = hosp.doctors[2]
-        >>> hosp.coverage(bob, alice)
-        [datetime.date(2017, 1, 28), datetime.date(2017, 1, 24)]
+        >>> sorted(hosp.coverage(bob, alice))
+        [datetime.date(2017, 1, 24), datetime.date(2017, 1, 28)]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> bob = hosp.doctors[1]
         >>> alice = hosp.doctors[3]
-        >>> hosp.coverage(bob, alice)
+        >>> sorted(hosp.coverage(bob, alice))
         [datetime.date(1997, 10, 17), datetime.date(1997, 11, 30)]
         """
-
         # ===== #
         # TO DO #
         # ===== #
-
         pass
 
-    def sick_days(self, doctor: Doctor) -> List[datetime]:
+    def sick_days(self, doctor: Doctor) -> List[datetime.date]:
         """
         Return the days <doctor> was sick.
 
@@ -737,11 +762,9 @@ class Hospital:
          datetime.date(1997, 10, 13), datetime.date(1997, 10, 29),
          datetime.date(1997, 12, 7)]
         """
-
         # ===== #
         # TO DO #
         # ===== #
-
         pass
 
     def attended_to(self, patient: Patient) -> List[Doctor]:
@@ -756,18 +779,19 @@ class Hospital:
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> hosp.attended_to(hosp.patients[0])
+        >>> pat = hosp.patients[0]
+        >>> sorted(hosp.attended_to(pat))
         [Did: 99262168, Did: 99628500]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> hosp.attended_to(hosp.patients[0]) #doctest: +NORMALIZE_WHITESPACE
-        [Did: 99679013, Did: 99055562, Did: 99103117, Did: 99093432,
-        Did: 99106844]
+        >>> pat = hosp.patients[0]
+        >>> sorted(hosp.attended_to(pat)) #doctest: +NORMALIZE_WHITESPACE
+        [Did: 99055562, Did: 99093432, Did: 99103117, Did: 99106844,
+        Did: 99679013]
         """
         # ===== #
         # TO DO #
         # ===== #
-
         pass
 
     def prescribed_rate(self, doctor: Doctor, medication: str) -> float:
@@ -792,21 +816,17 @@ class Hospital:
         >>> hosp.prescribed_rate(hosp.doctors[1], 'Amiodarone HCl')
         3.125
         """
-
         # ===== #
         # TO DO #
         # ===== #
-
         pass
 
 
 if __name__ == "__main__":
     import doctest
-
     doctest.testmod()
 
     import python_ta
-
     python_ta.check_all(config={
         'allowed-io': [
             'loaddata.load_doctors',
@@ -815,9 +835,8 @@ if __name__ == "__main__":
             'loaddata.load_attendance',
             'loaddata.read_hospital',
             'load_schedules'
-        ],
+            ],
         'allowed-import-modules': [
-            'loaddata',
             'doctest',
             'python_ta',
             'datetime',
