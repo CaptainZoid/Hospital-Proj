@@ -46,7 +46,7 @@ class HospitalVisit:
 
     Representation Invariants
     =========================
-    - not followup_date or date <= followup_date
+    - not followup_date or date < followup_date
 
     Sample Usage
     ============
@@ -232,7 +232,7 @@ class Patient:
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
         >>> hosp.patients[0].is_prescribed("Propofol")
-        True
+        False
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
         >>> hosp.patients[3].is_prescribed("Propofol")
@@ -268,11 +268,11 @@ class Patient:
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
         >>> sorted(hosp.patients[0].followups('Feb'))
-        [datetime.date(2017, 2, 6)]
+        [datetime.date(2017, 2, 2)]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
         >>> sorted(hosp.patients[1].followups('Sep'))
-        [datetime.date(1997, 9, 11), datetime.date(1997, 9, 26)]
+        [datetime.date(1997, 9, 2), datetime.date(1997, 9, 20)]
         """
         int_month = 0
         for i in range(len(MONTH_ABBREV)):
@@ -310,14 +310,20 @@ class Patient:
         []
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
-        >>> sorted(hosp.patients[0].prescribed_after(datetime.date(1900,1,1)))
-        ['Amiodarone HCl', 'Propofol']
+        >>> sorted(hosp.patients[1].prescribed_after(datetime.date(1900,1,1)))\
+            #doctest: +NORMALIZE_WHITESPACE
+        ['Docusate Sodium', 'Hydrocortisone Na Succ.',
+         'Lansoprazole Oral Suspension',
+         'Lansoprazole Oral Suspension', 'Lidocaine']
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
         >>> sorted(hosp.patients[0].prescribed_after(datetime.date(1900,1,1))) \
             #doctest: +NORMALIZE_WHITESPACE
-        ['Acetaminophen', 'Hydrochlorothiazide', 'Miconazole Powder',
-         'Sucralfate', 'sodium bicarb']
+        ['Acetaminophen', 'Docusate Sodium', 'Hydrochlorothiazide',
+         'Ipratropium Bromide MDI', 'Lansoprazole Oral Suspension',
+         'Levofloxacin', 'Lidocaine', 'Morphine Sulfate', 'Neostigmine',
+         'Neutra-Phos', 'Spironolactone', 'sodium bicarb', 'sodium bicarb',
+         'sodium bicarb']
         """
         final = []
         for visit in self.history:
@@ -327,6 +333,8 @@ class Patient:
 
     def missed_followups(self) -> Tuple[int, int]:
         """ Return the number of missed and kept followups for this Patient.
+
+        Note: The return statement looks like:  return missed, kept
 
         >>> carol = Patient("Carol Loot", 44021721)
         >>> visits = []
@@ -354,32 +362,28 @@ class Patient:
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/janonly/")
         >>> hosp.patients[3].missed_followups()
-        (1, 0)
+        (4, 3)
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, "data/year97/")
         >>> hosp.patients[66].missed_followups()
-        (9, 2)
+        (12, 1)
         """
-        """
-                curr_ate: datetime
-                num_fu = 0
-                num_suc_fu = 0
-                if len(self.history) == 1:
-                    # In case there was only one visit
-                    return 1, 0
-                for i in range(len(self.history) - 1):
-                    curr_date = datetime.date(1400, 1, 1)
-                    # Just to have it assigned to something
-                    if self.history[i].followup_date:
-                        # Checking to see a follow up date actually exists
-                        curr_date = self.history[i].followup_date
-                        num_fu += 1
-                    for days in self.history:
-                        # Checking for matching dates
-                        if days.date == curr_date:
-                            num_suc_fu += 1
-                return num_fu, num_suc_fu
-                """
+        follow_ups = []
+        for visit in self.history:
+            if visit.followup_date is not None:
+                follow_ups.append(visit.followup_date)
+        kept = 0
+        not_kept = 0
+        for follow_up in follow_ups:
+            temp = 0
+            for visit in self.history:
+                if visit.date == follow_up:
+                    temp += 1
+            if temp == 1:
+                kept += 1
+            else:
+                not_kept += 1
+        return not_kept, kept
 
 
 class Hospital:
@@ -396,6 +400,8 @@ class Hospital:
     load_schedules: Updates doctors schedules from a file.
     load_admissions: Update admissions from a file.
     load_attendance: Updates attendance from a file.
+    load_doctors: Update self.attendance from a file.
+    load_patients: Update self.patients from a file.
 
     Sample Usage
     ============
@@ -484,7 +490,6 @@ class Hospital:
         >>> hosp.load_doctors("data/year97/doctors.csv")
         >>> hosp.load_schedules("data/year97/schedule.dat")
         """
-
         docs = []
         for doctor in self.doctors:
             docs.append(doctor.name)
@@ -508,16 +513,16 @@ class Hospital:
 
     def load_attendance(self, file_name: str) -> None:
         """
-        Update the attendance records for this Hospital from <file_name>,
-        a comma-delimited file.
+        Update the attendance records for this Hospital from <file_name>, a csv
+        file.
 
         Lines of <file_name> have the following format:
-            MM/DD/YYYY,firstname lastname,firstname lastname,...
+            DD/MM/YYYY,firstname lastname,firstname lastname,...
         For example:
             01/08/2019,Alice Liddle,Bob Loot
-            01/09/2019,Carol Bitter
+            02/08/2019,Carol Bitter
         which indicates that on 01/08/2019, Dr. Alice Liddle and Dr. Bob Loot
-        showed up for work, and on 01/09/2019 only Dr. Carol Bitter was working
+        showed up for work, and on 02/08/2019 only Dr. Carol Bitter was working
         at the hospital on that day.
 
         >>> hosp = Hospital("123 Welks Rd, Letterkenny ON, K0J-2E0, Canada")
@@ -575,12 +580,12 @@ class Hospital:
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> round(hosp.projected_expenses(), 0)
-        38630.0
+        >>> round(hosp.projected_expenses(), 2)
+        46381.67
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> round(hosp.projected_expenses(), 0)
-        622622.0
+        >>> round(hosp.projected_expenses(), 2)
+        1368941.26
         """
         total = 0
         for doctor in self.doctors:
@@ -598,12 +603,12 @@ class Hospital:
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> hosp.actual_expenses()
-        36851.56
+        >>> round(hosp.actual_expenses(), 2)
+        48502.41
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> hosp.actual_expenses()
-        623485.81
+        >>> round(hosp.actual_expenses(), 2)
+        1349201.46
         """
         total = 0
         for day in self.attendance:
@@ -622,14 +627,17 @@ class Hospital:
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> sorted(hosp.reminders(datetime.date(2017,1,1), 20))
-        [Pid: 44077293, Pid: 44276583, Pid: 44926521]
+        >>> sorted(hosp.reminders(datetime.date(2017,1,1), 2))
+        [Pid: 44524416]
         >>> hosp.reminders(datetime.date(2018,11,1), 300)
         []
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> sorted(hosp.reminders(datetime.date(1997,10,17), 3))
-        [Pid: 44065518, Pid: 44228524, Pid: 44522886, Pid: 44888118]
+        >>> sorted(hosp.reminders(datetime.date(1997,10,17), 3)) \
+            #doctest: +NORMALIZE_WHITESPACE
+        [Pid: 44045550, Pid: 44070721, Pid: 44139185, Pid: 44172567,
+         Pid: 44222838, Pid: 44248993, Pid: 44269262, Pid: 44358472,
+         Pid: 44366714, Pid: 44964920]
         """
         follow_ups = []
         new_time = date + datetime.timedelta(delta)
@@ -652,17 +660,17 @@ class Hospital:
         >>> d2 = datetime.date(2017, 1, 31)
         >>> bob = hosp.doctors[0]
         >>> hosp.patients_seen(bob, d1, d2)
-        1
-        >>> alice = hosp.doctors[2]
+        8
+        >>> alice = hosp.doctors[-1]
         >>> hosp.patients_seen(alice, d1, d2)
-        0
+        7
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> d1 = datetime.date(1997, 1, 1)
         >>> d2 = datetime.date(1997, 2, 1)
-        >>> bob = hosp.doctors[0]
+        >>> bob = hosp.doctors[2]
         >>> hosp.patients_seen(bob, d1, d2)
-        5
+        8
         """
         total = 0
         temp_list = []
@@ -684,55 +692,70 @@ class Hospital:
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
         >>> d1 = datetime.date(2017, 1, 1)
-        >>> d2 = datetime.date(2017, 1, 31)
+        >>> d2 = datetime.date(2017, 1, 3)
         >>> sorted(hosp.busiest_doctors(d1, d2))
-        [Did: 99262168]
+        [Did: 99591940]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> d1 = datetime.date(1997, 1, 1)
         >>> d2 = datetime.date(1997, 2, 1)
         >>> sorted(hosp.busiest_doctors(d1, d2))
-        [Did: 99366005]
+        [Did: 99298240, Did: 99817905]
         """
+        # overly complicated code
         doc_nums = {}
         # Adding doctors to the dictionary
         for doctor in self.doctors:
-            doc_nums[doctor] = 0
+            doc_nums[doctor.id] = 0
         # checking the visits
         for people in self.patients:
             for visit in people.history:
-                if visit
+                for doctor in self.doctors:
+                    if visit.doctor_id == doctor.id and \
+                            start_date <= visit.date <= end_date:
+                        doc_nums[doctor.id] += 1
+        highest = []
+        high = 0
+        for doctor in self.doctors:
+            for ids in doc_nums:
+                if ids == doctor.id and doc_nums[ids] == high:
+                    highest.append(doctor)
+                elif ids == doctor.id and doc_nums[ids] > high:
+                    high = doc_nums[ids]
+                    highest = [doctor]
+        return highest
 
-
-
-
-    def coverage(self, bob: Doctor, alice: Doctor) -> List[datetime]:
+    def coverage(self, bob: Doctor, alice: Doctor) -> List[datetime.date]:
         """
         Return the dates where Dr <bob> covered for Dr <alice>.
 
         Definition (Covered):
-        <bob> COVERED FOR <alice"> on day X if and only if
+        <bob> COVERED FOR <alice> on day X if and only if
            1/  <bob> was not scheduled to work on day X, and
            2/  <bob> is on the attendance roll for day X, and
            3/  <alice> was sick on day X.
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> bob = hosp.doctors[6]
-        >>> alice = hosp.doctors[2]
+        >>> bob = hosp.doctors[0]
+        >>> alice = hosp.doctors[9]
         >>> sorted(hosp.coverage(bob, alice))
-        [datetime.date(2017, 1, 24), datetime.date(2017, 1, 28)]
+        [datetime.date(2017, 1, 16)]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> bob = hosp.doctors[1]
         >>> alice = hosp.doctors[3]
-        >>> sorted(hosp.coverage(bob, alice))
-        [datetime.date(1997, 10, 17), datetime.date(1997, 11, 30)]
+        >>> sorted(hosp.coverage(bob, alice)) #doctest: +NORMALIZE_WHITESPACE
+        [datetime.date(1997, 12, 19), datetime.date(1997, 12, 25)]
         """
-        # ===== #
-        # TO DO #
-        # ===== #
-        pass
+        final = []
+        for day in self.attendance:
+            for month in alice.schedule:
+                if day in alice.schedule[month] and \
+                        bob.name in self.attendance[day] and alice.name\
+                        not in self.attendance[day]:
+                    final.append(day)
+        return final
 
     def sick_days(self, doctor: Doctor) -> List[datetime.date]:
         """
@@ -747,25 +770,26 @@ class Hospital:
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
         >>> alice = hosp.doctors[0]
         >>> hosp.sick_days(alice)
-        []
+        [datetime.date(2017, 1, 19)]
         >>> bob = hosp.doctors[1]
         >>> sorted(hosp.sick_days(bob))
-        [datetime.date(2017, 1, 25), datetime.date(2017, 1, 26)]
+        [datetime.date(2017, 1, 27)]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> bob = hosp.doctors[0]
+        >>> bob = hosp.doctors[1]
         >>> sorted(hosp.sick_days(bob)) #doctest: +NORMALIZE_WHITESPACE
-        [datetime.date(1997, 1, 20), datetime.date(1997, 3, 13),
-         datetime.date(1997, 5, 23), datetime.date(1997, 6, 13),
-         datetime.date(1997, 6, 24), datetime.date(1997, 6, 25),
-         datetime.date(1997, 9, 28), datetime.date(1997, 10, 1),
-         datetime.date(1997, 10, 13), datetime.date(1997, 10, 29),
-         datetime.date(1997, 12, 7)]
+        [datetime.date(1997, 2, 21), datetime.date(1997, 2, 28),
+         datetime.date(1997, 5, 1), datetime.date(1997, 8, 20),
+         datetime.date(1997, 9, 2), datetime.date(1997, 10, 13)]
         """
-        # ===== #
-        # TO DO #
-        # ===== #
-        pass
+        final = []
+        for months in doctor.schedule:
+            for day in doctor.schedule[months]:
+                for assigned in self.attendance:
+                    if day == assigned and doctor.name not \
+                            in self.attendance[assigned]:
+                        final.append(day)
+        return final
 
     def attended_to(self, patient: Patient) -> List[Doctor]:
         """
@@ -775,51 +799,65 @@ class Hospital:
         Supposing
            1/  visit is from <patient>.history, and
            2/  Dr Bob's ID number is visit.doctor_id
-        then Dr Bob has ATTENDED TO Alice.
+        then Dr Bob has ATTENDED TO <patient>.
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> pat = hosp.patients[0]
-        >>> sorted(hosp.attended_to(pat))
-        [Did: 99262168, Did: 99628500]
+        >>> pat = hosp.patients[2]
+        >>> sorted(hosp.attended_to(pat)) #doctest: +NORMALIZE_WHITESPACE
+        [Did: 99155138, Did: 99292599, Did: 99354970, Did: 99591940,
+         Did: 99670080, Did: 99868960]
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
         >>> pat = hosp.patients[0]
         >>> sorted(hosp.attended_to(pat)) #doctest: +NORMALIZE_WHITESPACE
-        [Did: 99055562, Did: 99093432, Did: 99103117, Did: 99106844,
-        Did: 99679013]
+        [Did: 99043690, Did: 99145586, Did: 99261152, Did: 99298240,
+         Did: 99577919, Did: 99630377, Did: 99817905, Did: 99991977]
         """
-        # ===== #
-        # TO DO #
-        # ===== #
-        pass
+        final = []
+        for visit in patient.history:
+            if visit.doctor_id not in final:
+                final.append(visit.doctor_id)
+        srsly_final = []
+        for doctor in self.doctors:
+            if doctor.id in final:
+                srsly_final.append(doctor)
+        return srsly_final
 
     def prescribed_rate(self, doctor: Doctor, medication: str) -> float:
         """
         Return the prescription rate for <doctor> given <medication>.
 
         Definition (Prescription Rate):
-        For visits among all patients histories the PRESCRIPTION RATE for
-        <doctor> is:
+        For visits = [all hospital visits with visit.doctor_id == <doctor>.id]
+        PRESCRIPTION RATE for <doctor> is:
            number of visits where <medication> was prescribed
            ----------------------------------------------------- * 100
            number of visits where ANY medication was prescribed
 
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/janonly/')
-        >>> hosp.prescribed_rate(hosp.doctors[3], 'Amiodarone HCl')
-        50.0
+        >>> round(hosp.prescribed_rate(hosp.doctors[3], 'Meperidine'), 2)
+        12.5
         >>> hosp.prescribed_rate(hosp.doctors[3], 'Lithium')
         0.0
         >>> hosp = Hospital("123 Fake St.")
         >>> loaddata.read_hospital(hosp, 'data/year97/')
-        >>> hosp.prescribed_rate(hosp.doctors[1], 'Amiodarone HCl')
-        3.125
+        >>> round(hosp.prescribed_rate(hosp.doctors[1], 'Amiodarone HCl'), 2)
+        2.47
         """
-        # ===== #
-        # TO DO #
-        # ===== #
-        pass
+        medi_yes = 0
+        medi_any = 0
+        for patients in self.patients:
+            for visit in patients.history:
+                if visit.doctor_id == doctor.id and \
+                        visit.prescribed == medication:
+                    medi_any += 1
+                    medi_yes += 1
+                elif visit.doctor_id == doctor.id and \
+                        visit.prescribed is not None:
+                    medi_any += 1
+        return (medi_yes / medi_any) * 100
 
 
 if __name__ == "__main__":
@@ -842,6 +880,7 @@ if __name__ == "__main__":
             'datetime',
             'typing',
             'collections',
+            'loaddata',
             '__future__'
         ],
         'max-attributes': 15,

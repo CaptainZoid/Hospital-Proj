@@ -52,15 +52,17 @@ def load_admissions(hosp: Hospital, file_name: str) -> None:
     Reads admissions data from <file_name> into Hospital <hosp>.
 
     <file_name> is a csv file with HospitalVisit records of this format:
-         visit date, doctor id, patient id, diagnosis, prognosis, drug, followup
+        visit date, doctor id, patient id, diagnosis, prognosis, drug, followup
     For instance:
-         04/20/2017, 99722708, 44398694, Cold, poor, Advil, 2.5, 04/29/2017
+        04/20/2017, 99722708, 44398694, Cold, poor, Advil, 04/29/2017
+    or
+        04/20/2017, 99722708, 44398694, Cold, poor, Advil, None
     """
     with open(file_name, 'r') as file:
         csv_reader = csv.reader(file, delimiter=',')
         for row in csv_reader:
             # Sample:
-            # 04/20/2017, 99722708, 44398694, Cold, poor, Advil, 2.5, 04/29/2017
+            # 04/20/2017, 99722708, 44398694, Cold, poor, Advil, 04/29/2017
             intake, dr_id, patient_id, diagnosis = row[:4]
             prognosis, prescribed, followup = row[4:]
             intake = datetime.datetime.strptime(intake, '%m/%d/%Y').date()
